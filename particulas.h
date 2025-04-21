@@ -28,7 +28,7 @@ typedef struct {
 // Funções
 void inicializar_particulas(int semente, double tamanho_espaco, int tamanho_grade, long long num_particulas, Particula *particulas);
 void calcular_centros_de_massa(int grid_size, long long n_part, double side, Particula *par, Celula **grid);
-long long calcular_forca_gravitacional(long long n_part, Particula *particulas);
-long long simular_particulas(Particula *particulas, long long num_particulas, int num_passos, double tamanho_espaco, int grid_size, Celula **grid);
+void calcular_forca_gravitacional(long long n_part, Particula *particulas);
+void simular_particulas(Particula *particulas, long long num_particulas, int num_passos, double tamanho_espaco, int grid_size, Celula **grid);
 
 #endif // PARTICULAS_H

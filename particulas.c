@@ -2,22 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <omp.h>
-
-#define G 6.67408e-11
-#define EPSILON2 (0.005 * 0.005)
-#define DELTAT 0.1
-
-#ifndef M_PI
-#define M_PI 3.141592653589793
-#endif
 
 unsigned int semente_aleatoria;
 
+// Inicializa o gerador com uma semente personalizada
 void iniciar_gerador_aleatorio(int entrada) {
     semente_aleatoria = entrada + 987654321;
 }
 
+// Retorna um número aleatório uniformemente distribuído entre 0 e 1
 double numero_aleatorio_uniforme() {
     int semente_temp = semente_aleatoria;
     semente_aleatoria ^= (semente_aleatoria << 13);
@@ -26,6 +19,7 @@ double numero_aleatorio_uniforme() {
     return 0.5 + 0.2328306e-09 * (semente_temp + (int)semente_aleatoria);
 }
 
+// Retorna um número aleatório com distribuição normal truncada em [0,1)
 double numero_aleatorio_normal() {
     double u1, u2, z;
     do {
@@ -37,6 +31,7 @@ double numero_aleatorio_normal() {
     return z;
 }
 
+// Inicializa as partículas com posições, velocidades e massas
 void inicializar_particulas(int semente, double tamanho_espaco, int tamanho_grade, long long num_particulas, Particula *particulas) {
     double (*gerador)() = semente < 0 ? numero_aleatorio_normal : numero_aleatorio_uniforme;
     iniciar_gerador_aleatorio(abs(semente));
@@ -55,11 +50,13 @@ void inicializar_particulas(int semente, double tamanho_espaco, int tamanho_grad
     }
 }
 
+// Função auxiliar para garantir que valores estão no intervalo [0, lado)
 static inline double normalizar_posicao(double pos, double lado) {
     pos = fmod(pos, lado);
     return pos < 0 ? pos + lado : pos;
 }
 
+// Função auxiliar para obter o índice da célula
 static inline int indice_celula(double coord, double lado, int grid_size) {
     int idx = (int)(coord / (lado / grid_size));
     if (idx < 0) return 0;
@@ -67,13 +64,14 @@ static inline int indice_celula(double coord, double lado, int grid_size) {
     return idx;
 }
 
+// Calcula os centros de massa de cada célula da grade
 void calcular_centros_de_massa(int grid_size, long long n_part, double lado, Particula *par, Celula **grid) {
-    #pragma omp parallel for collapse(2)
+    // Zera os valores da grade
     for (int i = 0; i < grid_size; i++)
         for (int j = 0; j < grid_size; j++)
             grid[i][j] = (Celula){0, 0, 0};
 
-    #pragma omp parallel for
+    // Acumula massa e posição ponderada por massa
     for (long long i = 0; i < n_part; i++) {
         if (par[i].massa <= 0) continue;
 
@@ -82,15 +80,13 @@ void calcular_centros_de_massa(int grid_size, long long n_part, double lado, Par
         int cx = indice_celula(x, lado, grid_size);
         int cy = indice_celula(y, lado, grid_size);
 
-        #pragma omp atomic
-        grid[cx][cy].massa_total += par[i].massa;
-        #pragma omp atomic
-        grid[cx][cy].cx += par[i].x * par[i].massa;
-        #pragma omp atomic
-        grid[cx][cy].cy += par[i].y * par[i].massa;
+        Celula *cel = &grid[cx][cy];
+        cel->massa_total += par[i].massa;
+        cel->cx += par[i].x * par[i].massa;
+        cel->cy += par[i].y * par[i].massa;
     }
 
-    #pragma omp parallel for collapse(2)
+    // Finaliza o cálculo dos centros de massa
     for (int i = 0; i < grid_size; i++) {
         for (int j = 0; j < grid_size; j++) {
             Celula *cel = &grid[i][j];
@@ -102,8 +98,8 @@ void calcular_centros_de_massa(int grid_size, long long n_part, double lado, Par
     }
 }
 
-long long calcular_forca_gravitacional(long long n_part, Particula *p) {
-    #pragma omp parallel for
+// Calcula a força gravitacional entre as partículas
+void calcular_forca_gravitacional(long long n_part, Particula *p) {
     for (long long i = 0; i < n_part; i++) {
         if (p[i].massa <= 0) continue;
 
@@ -115,6 +111,7 @@ long long calcular_forca_gravitacional(long long n_part, Particula *p) {
             double dx = p[j].x - p[i].x;
             double dy = p[j].y - p[i].y;
 
+            // Ajustes toroidais
             if (dx > 0.5) dx -= 1.0;
             if (dx < -0.5) dx += 1.0;
             if (dy > 0.5) dy -= 1.0;
@@ -128,30 +125,31 @@ long long calcular_forca_gravitacional(long long n_part, Particula *p) {
             fy += forca * dy * inv_dist;
         }
 
+        // Atualiza a velocidade
         p[i].vx += fx / p[i].massa * DELTAT;
         p[i].vy += fy / p[i].massa * DELTAT;
     }
-
-    return 0; // sem uso aqui, pois colisões são contadas depois
 }
 
-long long simular_particulas(Particula *p, long long n, int passos, double lado, int grid_size, Celula **grid) {
+// Simula o movimento das partículas por um número de passos
+void simular_particulas(Particula *p, long long n, int passos, double lado, int grid_size, Celula **grid) {
     long long num_colisoes = 0;
-
     for (int t = 0; t < passos; t++) {
         calcular_centros_de_massa(grid_size, n, lado, p, grid);
         calcular_forca_gravitacional(n, p);
 
-        #pragma omp parallel for
         for (long long i = 0; i < n; i++) {
             if (p[i].massa <= 0) continue;
+
+            // Atualiza posições com ajuste toroidal
             p[i].x = normalizar_posicao(p[i].x + p[i].vx * DELTAT, lado);
             p[i].y = normalizar_posicao(p[i].y + p[i].vy * DELTAT, lado);
         }
 
-        #pragma omp parallel for reduction(+:num_colisoes)
+        // Detecção e fusão de colisões (sem loop aninhado redundante)
         for (long long i = 0; i < n; i++) {
             if (p[i].massa <= 0) continue;
+
             for (long long j = i + 1; j < n; j++) {
                 if (p[j].massa <= 0) continue;
 
@@ -164,62 +162,25 @@ long long simular_particulas(Particula *p, long long n, int passos, double lado,
                 if (dy < -lado / 2) dy += lado;
 
                 if (dx * dx + dy * dy < EPSILON2) {
+                    // Fusão de partículas
                     double m_total = p[i].massa + p[j].massa;
-                    #pragma omp critical
-                    {
-                        if (p[i].massa > 0 && p[j].massa > 0) {
-                            p[i].x = (p[i].x * p[i].massa + p[j].x * p[j].massa) / m_total;
-                            p[i].y = (p[i].y * p[i].massa + p[j].y * p[j].massa) / m_total;
-                            p[i].vx = (p[i].vx * p[i].massa + p[j].vx * p[j].massa) / m_total;
-                            p[i].vy = (p[i].vy * p[i].massa + p[j].vy * p[j].massa) / m_total;
-                            p[i].massa = m_total;
-                            p[j].massa = 0;
-                            num_colisoes++;
-                        }
-                    }
+                    p[i].x = (p[i].x * p[i].massa + p[j].x * p[j].massa) / m_total;
+                    p[i].y = (p[i].y * p[i].massa + p[j].y * p[j].massa) / m_total;
+                    p[i].vx = (p[i].vx * p[i].massa + p[j].vx * p[j].massa) / m_total;
+                    p[i].vy = (p[i].vy * p[i].massa + p[j].vy * p[j].massa) / m_total;
+                    p[i].massa = m_total;
+
+                    p[j].massa = 0; // Marca como fundida
+                    num_colisoes++;
                 }
             }
         }
     }
 
-    return num_colisoes;
-}
+    // Apenas imprime a posição final da primeira partícula (como referência)
+    printf("%.3f %.3f\n", p[0].x, p[0].y);
 
-int main(int argc, char *argv[]) {
-    if (argc != 6) {
-        fprintf(stderr, "Uso: %s <semente> <lado> <tamanho_grade> <n_particulas> <passos>\n", argv[0]);
-        return 1;
-    }
+    printf("%lld\n", num_colisoes);
 
-    int semente = atoi(argv[1]);
-    double lado = atof(argv[2]);
-    int grid_size = atoi(argv[3]);
-    long long n_particulas = atoll(argv[4]);
-    int passos = atoi(argv[5]);
 
-    Particula *particulas = malloc(n_particulas * sizeof(Particula));
-
-    Celula **grid = malloc(grid_size * sizeof(Celula *));
-    for (int i = 0; i < grid_size; i++)
-        grid[i] = malloc(grid_size * sizeof(Celula));
-
-    inicializar_particulas(semente, lado, grid_size, n_particulas, particulas);
-
-    double tempo = -omp_get_wtime();
-    long long colisoes = simular_particulas(particulas, n_particulas, passos, lado, grid_size, grid);
-    tempo += omp_get_wtime();
-
-    // Saída padrão (obrigatória)
-    printf("%.3f %.3f\n", particulas[0].x, particulas[0].y);
-    printf("%lld\n", colisoes);
-
-    // Tempo (stderr)
-    fprintf(stderr, "%.1fs\n", tempo);
-
-    // Liberação de memória
-    for (int i = 0; i < grid_size; i++) free(grid[i]);
-    free(grid);
-    free(particulas);
-
-    return 0;
 }

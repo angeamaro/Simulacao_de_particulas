@@ -1,19 +1,29 @@
 # Nome do executável
-TARGET = parsim-omp
+TARGET = parsim
 
-# Compilador e flags
+# Compilador
 CC = gcc
-CFLAGS = -fopenmp -O2 -Wall -lm
 
-# Arquivo-fonte
-SRC = parsim-omp.c
+# Flags de compilação
+CFLAGS = -Wall -Wextra -O2 -std=c11
 
-# Regra padrão
-all: $(TARGET)
+# Biblioteca matemática
+LDFLAGS = -lm
 
-$(TARGET): $(SRC)
-	$(CC) $(SRC) -o $(TARGET) $(CFLAGS)
+# Arquivos-fonte
+SRCS = particulas.c parsim.c
 
-# Limpeza dos arquivos gerados
+# Arquivos-objeto
+OBJS = $(SRCS:.c=.o)
+
+# Regra padrão: compilar o projeto
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)  # <- Moved -lm here
+
+# Compilar arquivos individuais
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Limpar arquivos compilados
 clean:
-	rm -f $(TARGET)
+	rm -f $(OBJS) $(TARGET)
