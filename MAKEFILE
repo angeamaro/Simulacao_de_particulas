@@ -1,0 +1,19 @@
+# Nome do executável
+TARGET = parsim-omp
+
+# Compilador e flags
+CC = gcc
+CFLAGS = -fopenmp -O2 -Wall -lm
+
+# Arquivo-fonte
+SRC = parsim-omp.c
+
+# Regra padrão
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CC) $(SRC) -o $(TARGET) $(CFLAGS)
+
+# Limpeza dos arquivos gerados
+clean:
+	rm -f $(TARGET)
