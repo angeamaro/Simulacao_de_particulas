@@ -10,7 +10,7 @@
 
 #ifndef M_PI
 #define M_PI 3.141592653589793
-#endif
+#endif  
 
 unsigned int semente_aleatoria;
 
@@ -186,6 +186,7 @@ long long simular_particulas(Particula *p, long long n, int passos, double lado,
 }
 
 int main(int argc, char *argv[]) {
+    double tempo;
     if (argc != 6) {
         fprintf(stderr, "Uso: %s <semente> <lado> <tamanho_grade> <n_particulas> <passos>\n", argv[0]);
         return 1;
@@ -205,16 +206,18 @@ int main(int argc, char *argv[]) {
 
     inicializar_particulas(semente, lado, grid_size, n_particulas, particulas);
 
-    double tempo = -omp_get_wtime();
+     tempo = -omp_get_wtime();
     long long colisoes = simular_particulas(particulas, n_particulas, passos, lado, grid_size, grid);
     tempo += omp_get_wtime();
 
+
+    // Tempo (stderr)
+    fprintf(stderr, "%.1fs\n", tempo);
     // Saída padrão (obrigatória)
     printf("%.3f %.3f\n", particulas[0].x, particulas[0].y);
     printf("%lld\n", colisoes);
 
-    // Tempo (stderr)
-    fprintf(stderr, "%.1fs\n", tempo);
+    
 
     // Liberação de memória
     for (int i = 0; i < grid_size; i++) free(grid[i]);
