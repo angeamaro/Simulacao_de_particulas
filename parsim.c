@@ -3,6 +3,7 @@
 #include <omp.h>
 #include "particulas.h"
 
+
 int main(int argc, char *argv[]) {
     if (argc != 6) {
         fprintf(stderr, "Uso: ./parsim <semente> <tamanho do espaço> <tamanho da grade> <número de partículas> <número de passos>\n");
@@ -52,11 +53,11 @@ int main(int argc, char *argv[]) {
 
     // Inicializar partículas
     inicializar_particulas(semente, tamanho_espaco, tamanho_grade, num_particulas, particulas);
-      double tempo = -omp_get_wtime();
+     // double tempo = -omp_get_wtime();
     // Simular as partículas, passando todos os parâmetros necessários
     simular_particulas(particulas, num_particulas, num_passos, tamanho_espaco, tamanho_grade, grade);
-    tempo += omp_get_wtime();
-    printf("Tempo total: %f segundos\n", tempo);
+   // tempo += omp_get_wtime();
+   // printf("Tempo total: %f segundos\n", tempo);
     // Liberar memória alocada
     for (int i = 0; i < tamanho_grade; i++) {
         free(grade[i]);
